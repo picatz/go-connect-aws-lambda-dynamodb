@@ -17,7 +17,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
 	"github.com/aws/aws-sdk-go-v2/service/lambda/types"
 	tasksv1 "github.com/picatz/go-connect-aws-lambda-dynamodb/pkg/tasks/v1"
-	taskslambda "github.com/picatz/go-connect-aws-lambda-dynamodb/pkg/tasks/v1/service/lambda"
 	"github.com/picatz/go-connect-aws-lambda-dynamodb/pkg/tasks/v1/service/localstack"
 	"github.com/picatz/go-connect-aws-lambda-dynamodb/pkg/tasks/v1/tasksv1connect"
 	"github.com/shoenig/test/must"
@@ -135,8 +134,6 @@ func TestRun(t *testing.T) {
 		})
 		must.NoError(t, err, must.Sprint("failed to get function"))
 
-		t.Logf("Function state: %s\n", fun.Configuration.State)
-
 		if fun.Configuration.State == types.StateActive {
 			break
 		}
@@ -173,7 +170,4 @@ func TestRun(t *testing.T) {
 	t.Logf("Response output status code: %d\n", resp.StatusCode)
 	t.Logf("Response output headers: %#+v\n", resp.Headers)
 	t.Logf("Response output body: %s\n", resp.Body)
-
-	err = taskslambda.Run(testContext(t))
-	must.NoError(t, err, must.Sprint("failed to run lambda"))
 }

@@ -23,6 +23,10 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
+// TableTasks is the name of the DynamoDB table used to store tasks.
+var TableTasks = aws.String("tasks")
+
+// Server implements a tasks service.
 type Server struct {
 	logger   *slog.Logger
 	tracer   trace.Tracer
@@ -32,13 +36,9 @@ type Server struct {
 	_        tasksv1connect.UnimplementedTasksServiceHandler
 }
 
-// Shutdown shutsdown the OpenTelemetry SDK pipelines.
-func (s *Server) Shutdown(ctx context.Context) error {
-	return s.shutdown(ctx)
-}
-
-var TableTasks = aws.String("tasks")
-
+// NewServer initializes a new server instance with the provided AWS and OpenTelemetry configurations.
+// It sets up OpenTelemetry for observability (tracing and logging), configures AWS SDK with OpenTelemetry
+// middlewares, and returns a server instance ready to handle requests.
 func NewServer(
 	ctx context.Context,
 	awsConfig aws.Config,
@@ -115,6 +115,12 @@ func (s *Server) errorf(ctx context.Context, c connect.Code, underlying error, u
 	return connect.NewError(c, fmt.Errorf("%s: %s: %s", span.SpanContext().TraceID(), span.SpanContext().SpanID(), userMessage))
 }
 
+// Shutdown shutsdown the OpenTelemetry SDK pipelines.
+func (s *Server) Shutdown(ctx context.Context) error {
+	return s.shutdown(ctx)
+}
+
+// CreateTask creates a new task, stores it in DynamoDB, and returns the created task.
 func (s *Server) CreateTask(ctx context.Context, req *connect.Request[tasksv1.CreateTaskRequest]) (*connect.Response[tasksv1.CreateTaskResponse], error) {
 	task := &tasksv1.Task{
 		Id:          uuid.New().String(),
@@ -140,6 +146,7 @@ func (s *Server) CreateTask(ctx context.Context, req *connect.Request[tasksv1.Cr
 	}), nil
 }
 
+// DeleteTask deletes a task from DynamoDB based on the provided task ID.
 func (s *Server) DeleteTask(ctx context.Context, req *connect.Request[tasksv1.DeleteTaskRequest]) (*connect.Response[tasksv1.DeleteTaskResponse], error) {
 	taskID := req.Msg.GetId()
 
@@ -160,6 +167,7 @@ func (s *Server) DeleteTask(ctx context.Context, req *connect.Request[tasksv1.De
 	}), nil
 }
 
+// GetTask retrieves a task from DynamoDB based on the provided task ID.
 func (s *Server) GetTask(ctx context.Context, req *connect.Request[tasksv1.GetTaskRequest]) (*connect.Response[tasksv1.GetTaskResponse], error) {
 	taskId := req.Msg.GetId()
 
@@ -190,6 +198,7 @@ func (s *Server) GetTask(ctx context.Context, req *connect.Request[tasksv1.GetTa
 	}), nil
 }
 
+// ListTasks retrieves a list of tasks from DynamoDB with optional pagination and filtering.
 func (s *Server) ListTasks(ctx context.Context, req *connect.Request[tasksv1.ListTasksRequest]) (*connect.Response[tasksv1.ListTasksResponse], error) {
 	// Set default page size if not provided
 	pageSize := req.Msg.GetPageSize()
@@ -197,7 +206,7 @@ func (s *Server) ListTasks(ctx context.Context, req *connect.Request[tasksv1.Lis
 		pageSize = 10
 	}
 
-	// Initialize ExclusiveStartKey
+	// Setup page token for pagination if nessessary
 	var exclusiveStartKey map[string]types.AttributeValue
 	pageToken := req.Msg.GetPageToken()
 	if pageToken != "" {
@@ -259,14 +268,11 @@ func (s *Server) ListTasks(ctx context.Context, req *connect.Request[tasksv1.Lis
 	defer span.End()
 
 	tasks := make([]*tasksv1.Task, 0, len(resp.Items))
-	for _, item := range resp.Items {
-		task := &tasksv1.Task{}
-		err = dynabuf.Unmarshal(item, task)
-		if err != nil {
-			return nil, s.errorf(ctx, connect.CodeInternal, err, "failed to unmarshal task")
-		}
-		tasks = append(tasks, task)
+	err = dynabuf.Unmarshal(resp.Items, &tasks)
+	if err != nil {
+		return nil, s.errorf(ctx, connect.CodeInternal, err, "failed to unmarshal tasks")
 	}
+
 	span.End()
 
 	// Prepare the next page token if there are more items
@@ -289,6 +295,7 @@ func (s *Server) ListTasks(ctx context.Context, req *connect.Request[tasksv1.Lis
 	}), nil
 }
 
+// UpdateTask updates a task in DynamoDB based on the provided task ID and field mask.
 func (s *Server) UpdateTask(ctx context.Context, req *connect.Request[tasksv1.UpdateTaskRequest]) (*connect.Response[tasksv1.UpdateTaskResponse], error) {
 	// Extract the task and update mask from the request
 	updatedTask := req.Msg.GetTask()

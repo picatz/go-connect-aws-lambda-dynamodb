@@ -6,14 +6,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"math/rand/v2"
-	"time"
 
 	"connectrpc.com/connect"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/expression"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	"github.com/google/uuid"
 	"github.com/picatz/dynabuf"
 	"github.com/picatz/dynabuf/expr"
 	tasksv1 "github.com/picatz/go-connect-aws-lambda-dynamodb/pkg/tasks/v1"
@@ -87,12 +86,6 @@ func NewServer(
 	}, nil
 }
 
-// newID is a helper function to generate a new ULID-like string,
-// using just a timestamp and a random number.
-func newID() string {
-	return fmt.Sprintf("%d-%d", time.Now().UnixNano(), rand.Int64N(1000))
-}
-
 // errorf is a helper function to log an error, record it in the current span,
 // and return a connect.Error with the given code and user message. The error
 // message will include the trace ID and span ID for easier debugging, and the
@@ -124,7 +117,7 @@ func (s *Server) errorf(ctx context.Context, c connect.Code, underlying error, u
 
 func (s *Server) CreateTask(ctx context.Context, req *connect.Request[tasksv1.CreateTaskRequest]) (*connect.Response[tasksv1.CreateTaskResponse], error) {
 	task := &tasksv1.Task{
-		Id:          newID(),
+		Id:          uuid.New().String(),
 		Title:       req.Msg.GetTitle(),
 		Description: req.Msg.Description,
 		Completed:   req.Msg.GetCompleted(),

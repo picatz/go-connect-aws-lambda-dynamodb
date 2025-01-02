@@ -245,6 +245,10 @@ go.opentelemetry.io/contrib/bridges/otelslog v0.8.0 h1:G3sKsNueSdxuACINFxKrQeimA
 go.opentelemetry.io/contrib/bridges/otelslog v0.8.0/go.mod h1:ptJm3wizguEPurZgarDAwOeX7O0iMR7l+QvIVenhYdE=
 go.opentelemetry.io/contrib/detectors/aws/lambda v0.58.0 h1:H/c3HZqlcWp4oX0DwxEANrId6KjRAueRPEcelatqJdI=
 go.opentelemetry.io/contrib/detectors/aws/lambda v0.58.0/go.mod h1:A/ZQKjsIrDGLKa/4S1eKe3/VdvHwllo8I+FY1fPE1lI=
+go.opentelemetry.io/contrib/instrumentation/github.com/aws/aws-lambda-go/otellambda v0.58.0 h1:QfTpKKkC4BvHdJ9oFoM+Z89d5WhpJ9tlG2g9sysz7F8=
+go.opentelemetry.io/contrib/instrumentation/github.com/aws/aws-lambda-go/otellambda v0.58.0/go.mod h1:AHgeN3nxgdMk3Zbyh7lNPcUIN+rTvuO26MAIKSJJcAw=
+go.opentelemetry.io/contrib/instrumentation/github.com/aws/aws-lambda-go/otellambda/xrayconfig v0.58.0 h1:JK3+tZZsXOjQMDbD3auqJMBl8Ygjqj6GL6FdskMxZw8=
+go.opentelemetry.io/contrib/instrumentation/github.com/aws/aws-lambda-go/otellambda/xrayconfig v0.58.0/go.mod h1:U4U5hkYpN8fduJNfF0qZjW2icq2nVz7wc4GWunhaHF4=
 go.opentelemetry.io/contrib/instrumentation/github.com/aws/aws-sdk-go-v2/otelaws v0.58.0 h1:g2rorZw2f1qnyfLOC7FP99argIWsN708Fjs2Zwz6SOk=
 go.opentelemetry.io/contrib/instrumentation/github.com/aws/aws-sdk-go-v2/otelaws v0.58.0/go.mod h1:QzTypGPlQn4NselMPALVKGwm/p3XKLVCB/UG2Dq3PxQ=
 go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.58.0 h1:yd02MEjBdJkG3uabWP9apV+OuWRIXGDuJEUJbOHmCFU=

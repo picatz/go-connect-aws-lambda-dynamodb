@@ -14,6 +14,8 @@ import (
 	"github.com/picatz/go-connect-aws-lambda-dynamodb/pkg/tasks/v1/service"
 	"github.com/picatz/go-connect-aws-lambda-dynamodb/pkg/tasks/v1/tasksv1connect"
 	lambdadetector "go.opentelemetry.io/contrib/detectors/aws/lambda"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/aws/aws-lambda-go/otellambda"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/aws/aws-lambda-go/otellambda/xrayconfig"
 	"go.opentelemetry.io/contrib/propagators/aws/xray"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/exporters/stdout/stdoutlog"
@@ -21,6 +23,7 @@ import (
 	"go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/resource"
 	"go.opentelemetry.io/otel/sdk/trace"
+	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
 	"google.golang.org/grpc"
 )
 
@@ -30,11 +33,17 @@ func Run(ctx context.Context) error {
 		return fmt.Errorf("failed to load aws config: %w", err)
 	}
 
-	detector := lambdadetector.NewResourceDetector()
-
-	res, err := detector.Detect(ctx)
+	res, err := resource.New(ctx,
+		resource.WithDetectors(lambdadetector.NewResourceDetector()),
+		resource.WithSchemaURL(semconv.SchemaURL),
+		resource.WithAttributes(
+			semconv.ServiceName("tasks"),
+			semconv.ServiceVersion("v0.0.0"),            // TODO: Use a real version.
+			semconv.DeploymentEnvironment("production"), // TODO: Use a real environment.
+		),
+	)
 	if err != nil {
-		res = resource.Default()
+		return fmt.Errorf("failed to create resource: %w", err)
 	}
 
 	traceExporter, err := otlptracegrpc.New(
@@ -52,15 +61,13 @@ func Run(ctx context.Context) error {
 		return fmt.Errorf("failed to create log exporter: %w", err)
 	}
 
-	idg := xray.NewIDGenerator()
-
 	otelConfig := &service.OTELConfig{
 		Propagator: xray.Propagator{},
 		TraceProvider: trace.NewTracerProvider(
 			trace.WithResource(res),
 			trace.WithSampler(trace.AlwaysSample()),
 			trace.WithBatcher(traceExporter),
-			trace.WithIDGenerator(idg),
+			trace.WithIDGenerator(xray.NewIDGenerator()),
 		),
 		LoggerProvider: log.NewLoggerProvider(
 			log.WithResource(res),
@@ -102,9 +109,13 @@ func Run(ctx context.Context) error {
 		),
 	)
 
-	adapter := httpadapter.New(mux)
-
-	lambda.Start(adapter.Proxy)
+	lambda.StartWithOptions(
+		otellambda.InstrumentHandler(
+			httpadapter.New(mux).Proxy,
+			xrayconfig.WithRecommendedOptions(otelConfig.TraceProvider)...,
+		),
+		lambda.WithContext(ctx),
+	)
 
 	return nil
 }

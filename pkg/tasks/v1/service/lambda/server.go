@@ -23,7 +23,6 @@ import (
 	"go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/resource"
 	"go.opentelemetry.io/otel/sdk/trace"
-	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
 	"google.golang.org/grpc"
 )
 
@@ -35,12 +34,6 @@ func Run(ctx context.Context) error {
 
 	res, err := resource.New(ctx,
 		resource.WithDetectors(lambdadetector.NewResourceDetector()),
-		resource.WithSchemaURL(semconv.SchemaURL),
-		resource.WithAttributes(
-			semconv.ServiceName("tasks"),
-			semconv.ServiceVersion("v0.0.0"),            // TODO: Use a real version.
-			semconv.DeploymentEnvironment("production"), // TODO: Use a real environment.
-		),
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create resource: %w", err)

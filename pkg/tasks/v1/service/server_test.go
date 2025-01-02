@@ -80,6 +80,8 @@ func TestServer(t *testing.T) {
 
 	awsConfig := localstack.Setup(t)
 
+	setupDynamoDB(t, awsConfig)
+
 	// Print with a JSON encoder that indents with two spaces.
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetIndent("", "  ")

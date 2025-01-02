@@ -6,6 +6,7 @@ require (
 	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.1-20241127180247-a33202765966.1
 	connectrpc.com/authn v0.2.0
 	connectrpc.com/connect v1.17.0
+	connectrpc.com/cors v0.1.0
 	connectrpc.com/otelconnect v0.7.1
 	connectrpc.com/validate v0.1.0
 	github.com/aws/aws-lambda-go v1.47.0
@@ -21,6 +22,7 @@ require (
 	github.com/picatz/dynabuf v0.0.0-20241230193431-4dc46648ce77
 	github.com/picatz/jose v0.0.0-20241214175604-bb7476e581e6
 	github.com/picatz/otel-tracetest-printer v0.0.0-20241230223140-f527e294b732
+	github.com/rs/cors v1.11.1
 	github.com/shoenig/test v1.12.0
 	github.com/spf13/cobra v1.8.1
 	github.com/testcontainers/testcontainers-go v0.34.0

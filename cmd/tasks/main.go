@@ -14,6 +14,7 @@ import (
 
 	"connectrpc.com/authn"
 	"connectrpc.com/connect"
+	connectcors "connectrpc.com/cors"
 	"connectrpc.com/otelconnect"
 	"connectrpc.com/validate"
 	"github.com/hashicorp/go-cleanhttp"
@@ -26,6 +27,7 @@ import (
 	"github.com/picatz/jose/pkg/header"
 	"github.com/picatz/jose/pkg/jwa"
 	"github.com/picatz/jose/pkg/jwt"
+	"github.com/rs/cors"
 	"github.com/spf13/cobra"
 	"go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
@@ -375,6 +377,18 @@ var serverCmd = &cobra.Command{
 			httpServer.Handler = authMiddleware.Wrap(mux)
 		}
 
+		c := cors.New(cors.Options{
+			AllowedOrigins: []string{"*"},
+			AllowedMethods: connectcors.AllowedMethods(),
+			AllowedHeaders: connectcors.AllowedHeaders(),
+			ExposedHeaders: connectcors.ExposedHeaders(),
+			MaxAge:         7200, // 2 hours in seconds
+			// Debug:          true,
+			// Logger:         log.New(os.Stderr, "cors: ", log.LstdFlags),
+		})
+
+		httpServer.Handler = c.Handler(httpServer.Handler)
+
 		httpServer.RegisterOnShutdown(func() {
 			srv.Shutdown(ctx)
 		})
@@ -383,7 +397,7 @@ var serverCmd = &cobra.Command{
 		go func() {
 			log.Println("Starting server on", httpServer.Addr)
 			if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-				log.Fatalf("ListenAndServe error: %v", err)
+				log.Fatalf("Server listener error: %v", err)
 			}
 		}()
 

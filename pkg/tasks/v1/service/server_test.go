@@ -15,9 +15,6 @@ import (
 	"connectrpc.com/connect"
 	"connectrpc.com/otelconnect"
 	"connectrpc.com/validate"
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
-	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 
 	tasksv1 "github.com/picatz/go-connect-aws-lambda-dynamodb/pkg/tasks/v1"
 	"github.com/picatz/go-connect-aws-lambda-dynamodb/pkg/tasks/v1/service"
@@ -49,38 +46,13 @@ func testContext(t *testing.T) context.Context {
 	return ctx
 }
 
-func setupDynamoDB(t *testing.T, awsConfig aws.Config) aws.Config {
-	ctx := testContext(t)
-
-	dynamoDBClient := dynamodb.NewFromConfig(awsConfig)
-
-	_, err := dynamoDBClient.CreateTable(ctx, &dynamodb.CreateTableInput{
-		TableName:   service.TableTasks,
-		BillingMode: types.BillingModePayPerRequest,
-		KeySchema: []types.KeySchemaElement{
-			{
-				AttributeName: aws.String("id"),
-				KeyType:       types.KeyTypeHash,
-			},
-		},
-		AttributeDefinitions: []types.AttributeDefinition{
-			{
-				AttributeName: aws.String("id"),
-				AttributeType: types.ScalarAttributeTypeS,
-			},
-		},
-	})
-	must.NoError(t, err, must.Sprint("failed to create table"))
-
-	return awsConfig
-}
-
 func TestServer(t *testing.T) {
 	ctx := context.Background()
 
 	awsConfig := localstack.Setup(t)
 
-	setupDynamoDB(t, awsConfig)
+	err := localstack.SetupDynamoDB(ctx, awsConfig)
+	must.NoError(t, err)
 
 	// Print with a JSON encoder that indents with two spaces.
 	enc := json.NewEncoder(os.Stdout)

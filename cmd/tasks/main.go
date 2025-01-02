@@ -2,17 +2,33 @@ package main
 
 import (
 	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
 	"fmt"
+	"log"
+	"net/http"
 	"os"
 	"os/signal"
+	"time"
 
+	"connectrpc.com/authn"
 	"connectrpc.com/connect"
+	"connectrpc.com/otelconnect"
+	"connectrpc.com/validate"
 	"github.com/hashicorp/go-cleanhttp"
 	"github.com/hashicorp/go-retryablehttp"
 	tasksv1 "github.com/picatz/go-connect-aws-lambda-dynamodb/pkg/tasks/v1"
+	"github.com/picatz/go-connect-aws-lambda-dynamodb/pkg/tasks/v1/service"
 	taskslambda "github.com/picatz/go-connect-aws-lambda-dynamodb/pkg/tasks/v1/service/lambda"
+	"github.com/picatz/go-connect-aws-lambda-dynamodb/pkg/tasks/v1/service/localstack"
 	"github.com/picatz/go-connect-aws-lambda-dynamodb/pkg/tasks/v1/tasksv1connect"
+	"github.com/picatz/jose/pkg/header"
+	"github.com/picatz/jose/pkg/jwa"
+	"github.com/picatz/jose/pkg/jwt"
 	"github.com/spf13/cobra"
+	"go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/fieldmaskpb"
@@ -51,6 +67,8 @@ var createCmd = &cobra.Command{
 			return fmt.Errorf("failed to marshal response: %w", err)
 		}
 
+		b = append(b, '\n')
+
 		_, err = cmd.OutOrStdout().Write(b)
 		if err != nil {
 			return fmt.Errorf("failed to write task ID: %w", err)
@@ -86,6 +104,8 @@ var getCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("failed to marshal response: %w", err)
 		}
+
+		b = append(b, '\n')
 
 		_, err = cmd.OutOrStdout().Write(b)
 		if err != nil {
@@ -139,6 +159,8 @@ var listCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("failed to marshal response: %w", err)
 		}
+
+		b = append(b, '\n')
 
 		_, err = cmd.OutOrStdout().Write(b)
 		if err != nil {
@@ -202,6 +224,8 @@ var updateCmd = &cobra.Command{
 			return fmt.Errorf("failed to marshal response: %w", err)
 		}
 
+		b = append(b, '\n')
+
 		_, err = cmd.OutOrStdout().Write(b)
 		if err != nil {
 			return fmt.Errorf("failed to write task: %w", err)
@@ -239,6 +263,8 @@ var deleteCmd = &cobra.Command{
 			return fmt.Errorf("failed to marshal response: %w", err)
 		}
 
+		b = append(b, '\n')
+
 		_, err = cmd.OutOrStdout().Write(b)
 		if err != nil {
 			return fmt.Errorf("failed to write task: %w", err)
@@ -246,6 +272,140 @@ var deleteCmd = &cobra.Command{
 
 		return nil
 	},
+}
+
+var serverCmd = &cobra.Command{
+	Use:   "server",
+	Short: "Start a tasks server for local development",
+	Args:  cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := cmd.Context()
+
+		awsConfig, cleanup, err := localstack.SetupDev(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to setup localstack: %w", err)
+		}
+		defer cleanup()
+
+		err = localstack.SetupDynamoDB(ctx, awsConfig)
+		if err != nil {
+			return fmt.Errorf("failed to setup dynamodb: %w", err)
+		}
+
+		exporter := tracetest.NewInMemoryExporter()
+
+		mux := http.NewServeMux()
+
+		srv, err := service.NewServer(
+			ctx,
+			awsConfig,
+			&service.OTELConfig{
+				TraceProvider: trace.NewTracerProvider(
+					trace.WithSyncer(exporter),
+				),
+			},
+		)
+		if err != nil {
+			return fmt.Errorf("failed to create server: %w", err)
+		}
+
+		otelInterceptor, err := otelconnect.NewInterceptor()
+		if err != nil {
+			return fmt.Errorf("failed to create otel interceptor: %w", err)
+		}
+
+		validateInterceptor, err := validate.NewInterceptor()
+		if err != nil {
+			return fmt.Errorf("failed to create validate interceptor: %w", err)
+		}
+
+		mux.Handle(
+			tasksv1connect.NewTasksServiceHandler(
+				srv,
+				connect.WithInterceptors(
+					otelInterceptor,
+					validateInterceptor,
+				),
+			),
+		)
+
+		httpServer := &http.Server{
+			Addr:    "127.0.0.1:9090",
+			Handler: mux,
+		}
+
+		if enabled, _ := cmd.Flags().GetBool("auth"); enabled {
+			privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+			if err != nil {
+				return fmt.Errorf("failed to generate private key: %w", err)
+			}
+
+			token, err := jwt.New(
+				header.Parameters{
+					header.Type:      jwt.Type,
+					header.Algorithm: jwa.ES256,
+				},
+				jwt.ClaimsSet{
+					"sub":  "1234567890",
+					"name": "John Doe",
+				},
+				privateKey,
+			)
+			if err != nil {
+				return fmt.Errorf("failed to create token: %w", err)
+			}
+
+			fmt.Fprintf(os.Stderr, "use token for client requests:\n")
+			fmt.Fprintf(os.Stdout, "export TASKS_TOKEN=%q\n", token)
+
+			authMiddleware := authn.NewMiddleware(func(ctx context.Context, r *http.Request) (any, error) {
+				bearerToken, err := jwt.FromHTTPAuthorizationHeader(r)
+				if err != nil {
+					return nil, authn.Errorf("failed to get bearer token from authorization header: %w", err)
+				}
+
+				token, err := jwt.ParseAndVerify(bearerToken, jwt.WithKey(&privateKey.PublicKey))
+				if err != nil {
+					return nil, authn.Errorf("failed to parse and verify bearer token: %w", err)
+				}
+
+				return token, nil
+			})
+
+			httpServer.Handler = authMiddleware.Wrap(mux)
+		}
+
+		httpServer.RegisterOnShutdown(func() {
+			srv.Shutdown(ctx)
+		})
+
+		// Start the server in a goroutine.
+		go func() {
+			log.Println("Starting server on", httpServer.Addr)
+			if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				log.Fatalf("ListenAndServe error: %v", err)
+			}
+		}()
+
+		// Wait for the interrupt signal.
+		<-ctx.Done()
+		log.Println("Shutdown signal received")
+
+		// Create a context with timeout for the shutdown process.
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		// Attempt graceful shutdown.
+		if err := httpServer.Shutdown(shutdownCtx); err != nil {
+			log.Fatalf("Server forced to shutdown: %v", err)
+		}
+
+		return nil
+	},
+}
+
+func init() {
+	serverCmd.Flags().Bool("auth", false, "Enable JWT authentication")
 }
 
 var client tasksv1connect.TasksServiceClient
@@ -267,6 +427,7 @@ func main() {
 	rootCmd.AddCommand(listCmd)
 	rootCmd.AddCommand(updateCmd)
 	rootCmd.AddCommand(deleteCmd)
+	rootCmd.AddCommand(serverCmd)
 
 	serverAddr := os.Getenv("TASKS_SERVER_ADDR")
 	if serverAddr == "" {
@@ -295,6 +456,7 @@ func main() {
 
 	retryClient := retryablehttp.NewClient()
 	retryClient.RetryMax = 3
+	retryClient.Logger = nil
 	retryClient.HTTPClient = cleanhttp.DefaultClient()
 
 	client = tasksv1connect.NewTasksServiceClient(

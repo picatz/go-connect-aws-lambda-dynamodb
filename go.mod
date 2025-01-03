@@ -19,7 +19,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/go-cleanhttp v0.5.2
 	github.com/hashicorp/go-retryablehttp v0.7.7
-	github.com/picatz/dynabuf v0.0.0-20241230193431-4dc46648ce77
+	github.com/picatz/dynabuf v0.0.0-20250103013637-3d581fea53fa
 	github.com/picatz/jose v0.0.0-20241214175604-bb7476e581e6
 	github.com/picatz/otel-tracetest-printer v0.0.0-20241230223140-f527e294b732
 	github.com/rs/cors v1.11.1

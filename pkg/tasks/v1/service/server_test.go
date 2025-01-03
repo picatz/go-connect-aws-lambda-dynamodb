@@ -54,7 +54,6 @@ func TestServer(t *testing.T) {
 	err := localstack.SetupDynamoDB(ctx, awsConfig)
 	must.NoError(t, err)
 
-	// Print with a JSON encoder that indents with two spaces.
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetIndent("", "  ")
 
@@ -221,22 +220,44 @@ func TestServer(t *testing.T) {
 	must.NoError(t, err, must.Sprint("failed to list tasks"))
 	must.Len(t, 2, simpleListResp.Msg.GetTasks())
 
-	// List tasks with filter and verify there is one completed task.
-	filterListRespNoResults, err := authenticatedClient.ListTasks(ctx, &connect.Request[tasksv1.ListTasksRequest]{
-		Msg: &tasksv1.ListTasksRequest{
-			Filter: proto.String("completed == false"),
+	// Test various filters.
+	for _, test := range []struct {
+		filter string
+		count  int
+	}{
+		{
+			filter: "completed == true",
+			count:  1,
 		},
-	})
-	must.NoError(t, err, must.Sprint("failed to list tasks with filter"))
-	must.Len(t, 1, filterListRespNoResults.Msg.GetTasks())
-
-	filterListRespResults, err := authenticatedClient.ListTasks(ctx, &connect.Request[tasksv1.ListTasksRequest]{
-		Msg: &tasksv1.ListTasksRequest{
-			Filter: proto.String("completed == true"),
+		{
+			filter: "completed == false",
+			count:  1,
 		},
-	})
-	must.NoError(t, err, must.Sprint("failed to list tasks with filter"))
-	must.Len(t, 1, filterListRespResults.Msg.GetTasks())
+		{
+			filter: "completed == false && title == 'test2'",
+			count:  1,
+		},
+		{
+			filter: "completed == false || title == 'test'",
+			count:  2,
+		},
+		{
+			filter: "begins_with(title, 'test')", // DynamoDB native feeling filter.
+			count:  2,
+		},
+		{
+			filter: "title.startsWith('test')", // CEL native feeling filter.
+			count:  2,
+		},
+	} {
+		filterListResp, err := authenticatedClient.ListTasks(ctx, &connect.Request[tasksv1.ListTasksRequest]{
+			Msg: &tasksv1.ListTasksRequest{
+				Filter: proto.String(test.filter),
+			},
+		})
+		must.NoError(t, err, must.Sprintf("failed to list tasks with filter: %s", test.filter))
+		must.Len(t, test.count, filterListResp.Msg.GetTasks())
+	}
 
 	deleteResp, err := authenticatedClient.DeleteTask(ctx, &connect.Request[tasksv1.DeleteTaskRequest]{
 		Msg: &tasksv1.DeleteTaskRequest{

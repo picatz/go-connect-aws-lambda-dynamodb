@@ -188,6 +188,10 @@ github.com/opencontainers/image-spec v1.1.0 h1:8SG7/vwALn54lVB/0yZ/MMwhFrPYtpEHQ
 github.com/opencontainers/image-spec v1.1.0/go.mod h1:W4s4sFTMaBeK1BQLXbG4AdM2szdn85PY75RI83NrTrM=
 github.com/picatz/dynabuf v0.0.0-20241230193431-4dc46648ce77 h1:Kx3j3y26hgR/rVI6BQW5LtufRyjRQeMGi8rx330MnnU=
 github.com/picatz/dynabuf v0.0.0-20241230193431-4dc46648ce77/go.mod h1:vAq/U5T2B4UM7IwCK40X09CNidGE/vK8nXeeJ3OBIHI=
+github.com/picatz/dynabuf v0.0.0-20250102005255-a684d8050aea h1:iuvx0PKS43XoGijl0vEVzXte1Vq143FhGHVnqLlhDRc=
+github.com/picatz/dynabuf v0.0.0-20250102005255-a684d8050aea/go.mod h1:xi+wcKTaXHwpRqBj8Aj32VaGij660+99xxYEy8w/qwg=
+github.com/picatz/dynabuf v0.0.0-20250103013637-3d581fea53fa h1:4doxoD9vL8DdcIhj4MeNd6z/ENwTzTyFJjvHOsii4Pc=
+github.com/picatz/dynabuf v0.0.0-20250103013637-3d581fea53fa/go.mod h1:xi+wcKTaXHwpRqBj8Aj32VaGij660+99xxYEy8w/qwg=
 github.com/picatz/jose v0.0.0-20241214175604-bb7476e581e6 h1:0BMDFafFusuLwdMz9L6Lwhq7s1kRexHjoYMnVTzDR8Q=
 github.com/picatz/jose v0.0.0-20241214175604-bb7476e581e6/go.mod h1:oXl4mV3HdFWqDCxjvZrLBWpeiw3iQhTwIdqtzw9ZKE8=
 github.com/picatz/otel-tracetest-printer v0.0.0-20241230223140-f527e294b732 h1:NYgE4JD41rdSF/ADS4/mEjBtT5oQRYJuSxy/OurDU9w=

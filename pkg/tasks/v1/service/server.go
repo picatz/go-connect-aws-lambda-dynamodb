@@ -86,12 +86,14 @@ func NewServer(
 	}, nil
 }
 
-// errorf is a helper function to log an error, record it in the current span,
-// and return a connect.Error with the given code and user message. The error
-// message will include the trace ID and span ID for easier debugging, and the
-// user message will be included as an attribute in the span. The error will
-// also be logged with the trace ID and span ID for correlation purposes.
-func (s *Server) errorf(ctx context.Context, c connect.Code, underlying error, userMessage string) error {
+// errorf logs an internal error, and records it in the trace span,
+// and returns an error with a user-friendly message. This is useful
+// to prevent leaking internal error details to the client that might
+// be present in the raw underlying error, while still providing enough
+// information for debugging to both users and operators appropriately.
+func (s *Server) errorf(ctx context.Context, c connect.Code, underlying error, userMessageFormat string, a ...interface{}) error {
+	userMessage := fmt.Sprintf(userMessageFormat, a...)
+
 	span := trace.SpanFromContext(ctx)
 
 	span.RecordError(

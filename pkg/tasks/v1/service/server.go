@@ -212,7 +212,6 @@ func (s *Server) ListTasks(ctx context.Context, req *connect.Request[tasksv1.Lis
 	var exclusiveStartKey map[string]types.AttributeValue
 	pageToken := req.Msg.GetPageToken()
 	if pageToken != "" {
-		// Decode pageToken to get ExclusiveStartKey
 		decodedToken, err := base64.URLEncoding.DecodeString(pageToken)
 		if err != nil {
 			return nil, s.errorf(ctx, connect.CodeInvalidArgument, err, "invalid page token")
@@ -280,7 +279,6 @@ func (s *Server) ListTasks(ctx context.Context, req *connect.Request[tasksv1.Lis
 	// Prepare the next page token if there are more items
 	var nextPageToken string
 	if len(resp.LastEvaluatedKey) > 0 {
-		// Encode LastEvaluatedKey as nextPageToken
 		encodedKey, err := json.Marshal(resp.LastEvaluatedKey)
 		if err != nil {
 			return nil, s.errorf(ctx, connect.CodeInternal, err, "failed to encode next page token")
@@ -302,14 +300,6 @@ func (s *Server) UpdateTask(ctx context.Context, req *connect.Request[tasksv1.Up
 	// Extract the task and update mask from the request
 	updatedTask := req.Msg.GetTask()
 	updateMask := req.Msg.GetUpdateMask()
-
-	// Validate input
-	if updatedTask == nil || updatedTask.Id == "" {
-		return nil, s.errorf(ctx, connect.CodeInvalidArgument, fmt.Errorf("task ID is required"), "task ID is required")
-	}
-	if updateMask == nil || len(updateMask.Paths) == 0 {
-		return nil, s.errorf(ctx, connect.CodeInvalidArgument, fmt.Errorf("update mask is required"), "update mask is required")
-	}
 
 	// Prepare the update expression based on the field mask
 	var updateExpr expression.UpdateBuilder

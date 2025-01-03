@@ -36,7 +36,14 @@ message CreateTaskResponse {
 
 message UpdateTaskRequest {
   Task task = 1 [(buf.validate.field).required = true];
-  google.protobuf.FieldMask update_mask = 2 [(buf.validate.field).required = true];
+  google.protobuf.FieldMask update_mask = 2 [
+    (buf.validate.field).required = true,
+    (buf.validate.field).cel = {
+      id: "valid_field_mask"
+      message: "a field mask path must be one of title, description, or completed"
+      expression: "size(this.paths) > 0 && this.paths.all(path, path in ['title', 'description', 'completed'])"
+    }
+  ];
 }
 
 message UpdateTaskResponse {

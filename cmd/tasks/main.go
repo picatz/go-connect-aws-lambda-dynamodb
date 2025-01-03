@@ -406,7 +406,7 @@ var serverCmd = &cobra.Command{
 		log.Println("Shutdown signal received")
 
 		// Create a context with timeout for the shutdown process.
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		shutdownCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 		defer cancel()
 
 		// Attempt graceful shutdown.

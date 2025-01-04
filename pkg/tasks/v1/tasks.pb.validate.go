@@ -1284,7 +1284,9 @@ func (m *ListTasksResponse) validate(all bool) error {
 
 	}
 
-	// no validation rules for NextPageToken
+	if m.NextPageToken != nil {
+		// no validation rules for NextPageToken
+	}
 
 	if len(errors) > 0 {
 		return ListTasksResponseMultiError(errors)

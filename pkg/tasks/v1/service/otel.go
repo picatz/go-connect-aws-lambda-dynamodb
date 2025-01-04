@@ -2,7 +2,9 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"os"
 	"time"
 
 	"go.opentelemetry.io/otel"
@@ -136,6 +138,7 @@ func newPropagator() propagation.TextMapPropagator {
 
 func newTraceProvider() (*trace.TracerProvider, error) {
 	traceExporter, err := stdouttrace.New(
+		stdouttrace.WithWriter(os.Stderr),
 		stdouttrace.WithPrettyPrint(),
 	)
 	if err != nil {
@@ -153,7 +156,13 @@ func newTraceProvider() (*trace.TracerProvider, error) {
 }
 
 func newMeterProvider() (*metric.MeterProvider, error) {
-	metricExporter, err := stdoutmetric.New()
+	enc := json.NewEncoder(os.Stderr)
+	// enc.SetIndent("", "  ")
+
+	metricExporter, err := stdoutmetric.New(
+		stdoutmetric.WithEncoder(enc),
+		// stdoutmetric.WithoutTimestamps(),
+	)
 	if err != nil {
 		return nil, err
 	}

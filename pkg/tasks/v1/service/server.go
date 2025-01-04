@@ -131,14 +131,14 @@ func (s *Server) CreateTask(ctx context.Context, req *connect.Request[tasksv1.Cr
 		Completed:   req.Msg.GetCompleted(),
 	}
 
-	taskItem, err := dynabuf.Marshal(task)
+	taskItem, err := task.Marshal()
 	if err != nil {
 		return nil, s.errorf(ctx, connect.CodeInternal, err, "failed to marshal task")
 	}
 
 	_, err = s.db.PutItem(ctx, &dynamodb.PutItemInput{
 		TableName: TableTasks,
-		Item:      taskItem.(map[string]types.AttributeValue),
+		Item:      taskItem,
 	})
 
 	s.logger.InfoContext(ctx, "created task", "task_id", task.Id)
@@ -150,54 +150,95 @@ func (s *Server) CreateTask(ctx context.Context, req *connect.Request[tasksv1.Cr
 
 // DeleteTask deletes a task from DynamoDB based on the provided task ID.
 func (s *Server) DeleteTask(ctx context.Context, req *connect.Request[tasksv1.DeleteTaskRequest]) (*connect.Response[tasksv1.DeleteTaskResponse], error) {
-	taskID := req.Msg.GetId()
+	task := &tasksv1.Task{
+		Id: req.Msg.GetId(),
+	}
 
-	_, err := s.db.DeleteItem(ctx, &dynamodb.DeleteItemInput{
+	primaryKey, err := task.PrimaryKey()
+	if err != nil {
+		return nil, s.errorf(ctx, connect.CodeInvalidArgument, err, "failed to get primary key")
+	}
+
+	_, err = s.db.DeleteItem(ctx, &dynamodb.DeleteItemInput{
 		TableName: TableTasks,
-		Key: map[string]types.AttributeValue{
-			"id": &types.AttributeValueMemberS{Value: taskID},
-		},
+		Key:       primaryKey,
 	})
 	if err != nil {
 		return nil, s.errorf(ctx, connect.CodeInternal, err, "failed to delete task")
 	}
 
-	s.logger.InfoContext(ctx, "deleted task", "task_id", taskID)
+	s.logger.InfoContext(ctx, "deleted task", "task_id", task.Id)
 
 	return connect.NewResponse(&tasksv1.DeleteTaskResponse{
-		Id: taskID,
+		Id: task.Id,
 	}), nil
 }
 
 // GetTask retrieves a task from DynamoDB based on the provided task ID.
 func (s *Server) GetTask(ctx context.Context, req *connect.Request[tasksv1.GetTaskRequest]) (*connect.Response[tasksv1.GetTaskResponse], error) {
-	taskId := req.Msg.GetId()
+	task := &tasksv1.Task{
+		Id: req.Msg.GetId(),
+	}
+
+	primaryKey, err := task.PrimaryKey()
+	if err != nil {
+		return nil, s.errorf(ctx, connect.CodeInvalidArgument, err, "failed to get primary key")
+	}
 
 	resp, err := s.db.GetItem(ctx, &dynamodb.GetItemInput{
 		TableName: TableTasks,
-		Key: map[string]types.AttributeValue{
-			"id": &types.AttributeValueMemberS{Value: taskId},
-		},
+		Key:       primaryKey,
 	})
 	if err != nil {
 		return nil, s.errorf(ctx, connect.CodeInternal, err, "failed to get task")
 	}
 
 	if resp.Item == nil {
-		return nil, s.errorf(ctx, connect.CodeNotFound, fmt.Errorf("unable to find task with ID %q", taskId), "task not found")
+		return nil, s.errorf(ctx, connect.CodeNotFound, fmt.Errorf("unable to find task with ID %q", task.Id), "task not found")
 	}
 
-	task := &tasksv1.Task{}
 	err = dynabuf.Unmarshal(resp.Item, task)
 	if err != nil {
 		return nil, s.errorf(ctx, connect.CodeInternal, err, "failed to unmarshal task")
 	}
 
-	s.logger.InfoContext(ctx, "got task", "task_id", taskId)
+	s.logger.InfoContext(ctx, "got task", "task_id", task.Id)
 
 	return connect.NewResponse(&tasksv1.GetTaskResponse{
 		Task: task,
 	}), nil
+}
+
+func decodePageToken(pageToken string) (map[string]types.AttributeValue, error) {
+	if pageToken == "" {
+		return nil, nil
+	}
+
+	decodedToken, err := base64.URLEncoding.DecodeString(pageToken)
+	if err != nil {
+		return nil, fmt.Errorf("invalid page token: %w", err)
+	}
+
+	var exclusiveStartKey map[string]types.AttributeValue
+	err = json.Unmarshal(decodedToken, &exclusiveStartKey)
+	if err != nil {
+		return nil, fmt.Errorf("invalid page token: %w", err)
+	}
+
+	return exclusiveStartKey, nil
+}
+
+func encodePageToken(exclusiveStartKey map[string]types.AttributeValue) (string, error) {
+	if len(exclusiveStartKey) == 0 {
+		return "", nil
+	}
+
+	encodedKey, err := json.Marshal(exclusiveStartKey)
+	if err != nil {
+		return "", fmt.Errorf("failed to encode next page token: %w", err)
+	}
+
+	return base64.URLEncoding.EncodeToString(encodedKey), nil
 }
 
 // ListTasks retrieves a list of tasks from DynamoDB with optional pagination and filtering.
@@ -209,16 +250,14 @@ func (s *Server) ListTasks(ctx context.Context, req *connect.Request[tasksv1.Lis
 	}
 
 	// Setup page token for pagination if nessessary
-	var exclusiveStartKey map[string]types.AttributeValue
-	pageToken := req.Msg.GetPageToken()
-	if pageToken != "" {
-		decodedToken, err := base64.URLEncoding.DecodeString(pageToken)
+	var (
+		exclusiveStartKey map[string]types.AttributeValue
+		err               error
+	)
+	if pageToken := req.Msg.GetPageToken(); pageToken != "" {
+		exclusiveStartKey, err = decodePageToken(pageToken)
 		if err != nil {
-			return nil, s.errorf(ctx, connect.CodeInvalidArgument, err, "invalid page token")
-		}
-		err = json.Unmarshal(decodedToken, &exclusiveStartKey)
-		if err != nil {
-			return nil, s.errorf(ctx, connect.CodeInvalidArgument, err, "invalid page token")
+			return nil, s.errorf(ctx, connect.CodeInvalidArgument, err, "failed to decode page token")
 		}
 	}
 
@@ -277,21 +316,21 @@ func (s *Server) ListTasks(ctx context.Context, req *connect.Request[tasksv1.Lis
 	span.End()
 
 	// Prepare the next page token if there are more items
-	var nextPageToken string
-	if len(resp.LastEvaluatedKey) > 0 {
-		encodedKey, err := json.Marshal(resp.LastEvaluatedKey)
+	var nextPageTokenResp *string
+	if resp.LastEvaluatedKey != nil {
+		nextPageToken, err := encodePageToken(resp.LastEvaluatedKey)
 		if err != nil {
 			return nil, s.errorf(ctx, connect.CodeInternal, err, "failed to encode next page token")
 		}
-		nextPageToken = base64.URLEncoding.EncodeToString(encodedKey)
+		nextPageTokenResp = &nextPageToken
 	}
 
-	s.logger.InfoContext(ctx, "listed tasks", "num_tasks", len(tasks), "page_size", pageSize, "next_page_token", nextPageToken)
+	s.logger.InfoContext(ctx, "listed tasks", "num_tasks", len(tasks), "page_size", pageSize)
 
 	// Construct and return the response
 	return connect.NewResponse(&tasksv1.ListTasksResponse{
 		Tasks:         tasks,
-		NextPageToken: nextPageToken,
+		NextPageToken: nextPageTokenResp,
 	}), nil
 }
 
@@ -322,14 +361,15 @@ func (s *Server) UpdateTask(ctx context.Context, req *connect.Request[tasksv1.Up
 		return nil, s.errorf(ctx, connect.CodeInternal, err, "failed to build update expression")
 	}
 
+	primaryKey, err := updatedTask.PrimaryKey()
+	if err != nil {
+		return nil, s.errorf(ctx, connect.CodeInvalidArgument, err, "failed to get primary key")
+	}
+
 	// Perform the update operation
 	input := &dynamodb.UpdateItemInput{
-		TableName: TableTasks,
-		Key: map[string]types.AttributeValue{
-			"id": &types.AttributeValueMemberS{
-				Value: updatedTask.Id,
-			},
-		},
+		TableName:                 TableTasks,
+		Key:                       primaryKey,
 		ExpressionAttributeNames:  expr.Names(),
 		ExpressionAttributeValues: expr.Values(),
 		UpdateExpression:          expr.Update(),

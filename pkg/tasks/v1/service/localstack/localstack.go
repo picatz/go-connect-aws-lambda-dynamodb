@@ -122,13 +122,21 @@ func SetupDynamoDB(ctx context.Context, awsConfig aws.Config) error {
 		BillingMode: types.BillingModePayPerRequest,
 		KeySchema: []types.KeySchemaElement{
 			{
-				AttributeName: aws.String("id"),
+				AttributeName: aws.String("pk"),
 				KeyType:       types.KeyTypeHash,
+			},
+			{
+				AttributeName: aws.String("sk"),
+				KeyType:       types.KeyTypeRange,
 			},
 		},
 		AttributeDefinitions: []types.AttributeDefinition{
 			{
-				AttributeName: aws.String("id"),
+				AttributeName: aws.String("pk"),
+				AttributeType: types.ScalarAttributeTypeS,
+			},
+			{
+				AttributeName: aws.String("sk"),
 				AttributeType: types.ScalarAttributeTypeS,
 			},
 		},

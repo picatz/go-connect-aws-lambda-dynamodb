@@ -5,7 +5,6 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -25,7 +24,6 @@ import (
 	"github.com/picatz/jose/pkg/jwt"
 	printer "github.com/picatz/otel-tracetest-printer"
 	"github.com/shoenig/test/must"
-	"go.opentelemetry.io/otel/exporters/stdout/stdoutmetric"
 	"go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 	"google.golang.org/protobuf/proto"
@@ -54,19 +52,7 @@ func TestServer(t *testing.T) {
 	err := localstack.SetupDynamoDB(ctx, awsConfig)
 	must.NoError(t, err)
 
-	enc := json.NewEncoder(os.Stdout)
-	enc.SetIndent("", "  ")
-
-	exp, err := stdoutmetric.New(
-		stdoutmetric.WithEncoder(enc),
-		stdoutmetric.WithoutTimestamps(),
-	)
-	must.NoError(t, err)
-	t.Cleanup(func() {
-		must.NoError(t, exp.Shutdown(ctx))
-	})
-
-	exporter := tracetest.NewInMemoryExporter()
+	traceExporter := tracetest.NewInMemoryExporter()
 
 	mux := http.NewServeMux()
 
@@ -75,7 +61,7 @@ func TestServer(t *testing.T) {
 		awsConfig,
 		&service.OTELConfig{
 			TraceProvider: trace.NewTracerProvider(
-				trace.WithSyncer(exporter),
+				trace.WithSyncer(traceExporter),
 			),
 		},
 	)
@@ -273,5 +259,5 @@ func TestServer(t *testing.T) {
 	})
 	must.Error(t, err, must.Sprint("expected error getting deleted task"))
 
-	printer.PrintSpanTree(os.Stdout, exporter.GetSpans())
+	printer.PrintSpanTree(os.Stdout, traceExporter.GetSpans())
 }

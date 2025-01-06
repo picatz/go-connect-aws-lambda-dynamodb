@@ -140,6 +140,9 @@ func (s *Server) CreateTask(ctx context.Context, req *connect.Request[tasksv1.Cr
 		TableName: TableTasks,
 		Item:      taskItem,
 	})
+	if err != nil {
+		return nil, s.errorf(ctx, connect.CodeInternal, err, "failed to create task")
+	}
 
 	s.logger.InfoContext(ctx, "created task", "task_id", task.Id)
 

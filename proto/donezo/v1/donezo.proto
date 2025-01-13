@@ -1,0 +1,486 @@
+syntax = "proto3";
+
+package donezo.v1;
+
+import "buf/validate/validate.proto";
+// import "google/api/annotations.proto";
+import "google/protobuf/field_mask.proto";
+// import "protoc-gen-openapiv2/options/annotations.proto";
+
+option go_package = "github.com/picatz/go-connect-aws-lambda-dynamodb/pkg/donezo/v1;donezov1";
+
+message Organization {
+  string id = 1 [(buf.validate.field).string.uuid = true];
+  string name = 2 [(buf.validate.field).string.max_len = 256];
+}
+
+message OrganizationMember {
+  string organization_id = 1 [(buf.validate.field).string.uuid = true];
+  string user_id = 2 [(buf.validate.field).string.uuid = true];
+  string role = 3 [(buf.validate.field).string.max_len = 256];
+}
+
+message Project {
+  string id = 1 [(buf.validate.field).string.uuid = true];
+  string name = 2 [(buf.validate.field).string.max_len = 256];
+  string organization_id = 3 [(buf.validate.field).string.uuid = true];
+}
+
+message User {
+  string id = 1 [(buf.validate.field).string.uuid = true];
+  string name = 2 [(buf.validate.field).string.max_len = 256];
+}
+
+message Task {
+  string id = 1 [(buf.validate.field).string.uuid = true];
+  string project_id = 2 [(buf.validate.field).string.uuid = true];
+  string organization_id = 3 [(buf.validate.field).string.uuid = true];
+  string title = 4 [
+    (buf.validate.field).string.max_len = 256,
+    (buf.validate.field).string.min_len = 1
+  ];
+  optional string description = 5 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 2048
+  }];
+  repeated string tags = 6 [(buf.validate.field).repeated = {
+    unique: true
+    max_items: 50
+    items: {
+      string: {
+        min_len: 1
+        max_len: 2048
+      }
+    }
+  }];
+  bool completed = 7;
+}
+
+message GetTaskRequest {
+  string id = 1 [(buf.validate.field).string.uuid = true];
+  string organization_id = 2 [(buf.validate.field).string.uuid = true];
+  string project_id = 3 [(buf.validate.field).string.uuid = true];
+}
+
+message GetTaskResponse {
+  Task task = 1 [(buf.validate.field).required = true];
+}
+
+message CreateTaskRequest {
+  string organization_id = 1 [(buf.validate.field).string.uuid = true];
+  string project_id = 2 [(buf.validate.field).string.uuid = true];
+  string title = 3 [
+    (buf.validate.field).string.min_len = 1,
+    (buf.validate.field).string.max_len = 256
+  ];
+  optional string description = 4 [(buf.validate.field).string.max_len = 2048];
+  optional bool completed = 5;
+}
+
+message CreateTaskResponse {
+  Task task = 1 [(buf.validate.field).required = true];
+}
+
+message UpdateTaskRequest {
+  Task task = 1 [(buf.validate.field).required = true];
+  google.protobuf.FieldMask update_mask = 2 [
+    (buf.validate.field).required = true,
+    (buf.validate.field).cel = {
+      id: "valid_field_mask"
+      message: "a field mask path must be one of title, description, or completed"
+      expression: "size(this.paths) > 0 && this.paths.all(path, path in ['title', 'description', 'completed'])"
+    }
+  ];
+}
+
+message UpdateTaskResponse {}
+
+message DeleteTaskRequest {
+  string id = 1 [(buf.validate.field).string.uuid = true];
+  string organization_id = 2 [(buf.validate.field).string.uuid = true];
+  string project_id = 3 [(buf.validate.field).string.uuid = true];
+}
+
+message DeleteTaskResponse {}
+
+message ListTasksRequest {
+  string organization_id = 1 [(buf.validate.field).string.uuid = true];
+  string project_id = 2 [(buf.validate.field).string.uuid = true];
+  optional int32 page_size = 3 [
+    (buf.validate.field).int32.gt = 0,
+    (buf.validate.field).int32.lte = 100
+  ];
+  optional string page_token = 4 [(buf.validate.field).string.max_len = 256];
+  optional string filter = 5 [(buf.validate.field).string.max_len = 1024];
+}
+
+message ListTasksResponse {
+  repeated Task tasks = 1;
+  optional string next_page_token = 2;
+}
+
+service TasksService {
+  rpc GetTask(GetTaskRequest) returns (GetTaskResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+    // option (google.api.http) = {get: "/v1/tasks/{id}"};
+    // option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+    //   summary: "Retrieve a task by ID"
+    //   tags: "Tasks"
+    // };
+  }
+
+  rpc CreateTask(CreateTaskRequest) returns (CreateTaskResponse) {
+    option idempotency_level = IDEMPOTENT;
+    // option (google.api.http) = {
+    //   post: "/v1/tasks"
+    //   body: "*"
+    // };
+    // option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+    //   summary: "Create a new task"
+    //   tags: "Tasks"
+    // };
+  }
+
+  rpc UpdateTask(UpdateTaskRequest) returns (UpdateTaskResponse) {
+    option idempotency_level = IDEMPOTENT;
+    // option (google.api.http) = {
+    //   put: "/v1/tasks/{task.id}"
+    //   body: "*"
+    // };
+    // option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+    //   summary: "Update a task by ID"
+    //   tags: "Tasks"
+    // };
+  }
+
+  rpc DeleteTask(DeleteTaskRequest) returns (DeleteTaskResponse) {
+    option idempotency_level = IDEMPOTENT;
+    // option (google.api.http) = {delete: "/v1/tasks/{id}"};
+    // option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+    //   summary: "Delete a task by ID"
+    //   tags: "Tasks"
+    // };
+  }
+
+  rpc ListTasks(ListTasksRequest) returns (ListTasksResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+    // option (google.api.http) = {get: "/v1/tasks"};
+    // option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+    //   summary: "List tasks"
+    //   tags: "Tasks"
+    // };
+  }
+}
+
+service OrganizationsService {
+  rpc GetOrganization(GetOrganizationRequest) returns (GetOrganizationResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  rpc CreateOrganization(CreateOrganizationRequest) returns (CreateOrganizationResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+
+  rpc UpdateOrganization(UpdateOrganizationRequest) returns (UpdateOrganizationResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+
+  rpc ListOrganizations(ListOrganizationsRequest) returns (ListOrganizationsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  rpc DeleteOrganization(DeleteOrganizationRequest) returns (DeleteOrganizationResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+
+  rpc GetOrganizationMember(GetOrganizationMemberRequest) returns (GetOrganizationMemberResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  rpc CreateOrganizationMember(CreateOrganizationMemberRequest) returns (CreateOrganizationMemberResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+
+  rpc UpdateOrganizationMember(UpdateOrganizationMemberRequest) returns (UpdateOrganizationMemberResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+
+  rpc ListOrganizationMembers(ListOrganizationMembersRequest) returns (ListOrganizationMembersResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  rpc DeleteOrganizationMember(DeleteOrganizationMemberRequest) returns (DeleteOrganizationMemberResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+}
+
+message GetOrganizationRequest {
+  string id = 1 [
+    (buf.validate.field).required = true,
+    (buf.validate.field).string.min_len = 1
+  ];
+}
+
+message GetOrganizationResponse {
+  Organization organization = 1 [(buf.validate.field).required = true];
+}
+
+message CreateOrganizationRequest {
+  string name = 1 [(buf.validate.field).string.min_len = 1];
+}
+
+message CreateOrganizationResponse {
+  Organization organization = 1 [(buf.validate.field).required = true];
+}
+
+message UpdateOrganizationRequest {
+  Organization organization = 1 [(buf.validate.field).required = true];
+  google.protobuf.FieldMask update_mask = 2 [
+    (buf.validate.field).required = true,
+    (buf.validate.field).cel = {
+      id: "valid_field_mask"
+      message: "a field mask path must be one of name"
+      expression: "size(this.paths) > 0 && this.paths.all(path, path in ['name'])"
+    }
+  ];
+}
+
+message UpdateOrganizationResponse {}
+
+message ListOrganizationsRequest {
+  optional int32 page_size = 1 [
+    (buf.validate.field).int32.gt = 0,
+    (buf.validate.field).int32.lte = 100
+  ];
+  optional string page_token = 2 [(buf.validate.field).string.max_len = 256];
+}
+
+message ListOrganizationsResponse {
+  repeated Organization organizations = 1;
+  optional string next_page_token = 2;
+}
+
+message DeleteOrganizationRequest {
+  string id = 1 [(buf.validate.field).string.min_len = 1];
+}
+
+message DeleteOrganizationResponse {}
+
+message GetOrganizationMemberRequest {
+  string user_id = 1 [
+    (buf.validate.field).required = true,
+    (buf.validate.field).string.min_len = 1
+  ];
+  string organization_id = 2 [
+    (buf.validate.field).required = true,
+    (buf.validate.field).string.min_len = 1
+  ];
+}
+
+message GetOrganizationMemberResponse {
+  OrganizationMember organization_member = 1 [(buf.validate.field).required = true];
+}
+
+message CreateOrganizationMemberRequest {
+  string user_id = 1 [(buf.validate.field).string.min_len = 1];
+  string organization_id = 2 [(buf.validate.field).string.min_len = 1];
+  string role = 3 [(buf.validate.field).string.max_len = 256];
+}
+
+message CreateOrganizationMemberResponse {
+  OrganizationMember organization_member = 1 [(buf.validate.field).required = true];
+}
+
+message UpdateOrganizationMemberResponse {}
+
+message UpdateOrganizationMemberRequest {
+  OrganizationMember organization_member = 1 [(buf.validate.field).required = true];
+  google.protobuf.FieldMask update_mask = 2 [
+    (buf.validate.field).required = true,
+    (buf.validate.field).cel = {
+      id: "valid_field_mask"
+      message: "a field mask path must be one of role"
+      expression: "size(this.paths) > 0 && this.paths.all(path, path in ['role'])"
+    }
+  ];
+}
+
+message ListOrganizationMembersRequest {
+  optional int32 page_size = 1 [
+    (buf.validate.field).int32.gt = 0,
+    (buf.validate.field).int32.lte = 100
+  ];
+  optional string page_token = 2 [(buf.validate.field).string.max_len = 256];
+}
+
+message ListOrganizationMembersResponse {
+  repeated OrganizationMember organization_members = 1;
+  optional string next_page_token = 2;
+}
+
+message DeleteOrganizationMemberRequest {
+  string user_id = 1 [(buf.validate.field).string.min_len = 1];
+  string organization_id = 2 [(buf.validate.field).string.min_len = 1];
+}
+
+message DeleteOrganizationMemberResponse {}
+
+service ProjectsService {
+  rpc GetProject(GetProjectRequest) returns (GetProjectResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  rpc CreateProject(CreateProjectRequest) returns (CreateProjectResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+
+  rpc UpdateProject(UpdateProjectRequest) returns (UpdateProjectResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+
+  rpc ListProjects(ListProjectsRequest) returns (ListProjectsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  rpc DeleteProject(DeleteProjectRequest) returns (DeleteProjectResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+}
+
+message GetProjectRequest {
+  string id = 1 [
+    (buf.validate.field).required = true,
+    (buf.validate.field).string.uuid = true
+  ];
+  string organization_id = 2 [
+    (buf.validate.field).required = true,
+    (buf.validate.field).string.uuid = true
+  ];
+}
+
+message GetProjectResponse {
+  Project project = 1 [(buf.validate.field).required = true];
+}
+
+message CreateProjectRequest {
+  string name = 1 [(buf.validate.field).string.min_len = 1];
+  string organization_id = 2 [(buf.validate.field).string.uuid = true];
+}
+
+message CreateProjectResponse {
+  Project project = 1 [(buf.validate.field).required = true];
+}
+
+message UpdateProjectRequest {
+  Project project = 1 [(buf.validate.field).required = true];
+  google.protobuf.FieldMask update_mask = 2 [
+    (buf.validate.field).required = true,
+    (buf.validate.field).cel = {
+      id: "valid_field_mask"
+      message: "a field mask path must be one of name"
+      expression: "size(this.paths) > 0 && this.paths.all(path, path in ['name'])"
+    }
+  ];
+}
+
+message UpdateProjectResponse {}
+
+message ListProjectsRequest {
+  optional int32 page_size = 1 [
+    (buf.validate.field).int32.gt = 0,
+    (buf.validate.field).int32.lte = 100
+  ];
+  optional string page_token = 2 [(buf.validate.field).string.max_len = 256];
+}
+
+message ListProjectsResponse {
+  repeated Project projects = 1;
+  optional string next_page_token = 2;
+}
+
+message DeleteProjectRequest {
+  string id = 1 [
+    (buf.validate.field).required = true,
+    (buf.validate.field).string.uuid = true
+  ];
+  string organization_id = 2 [
+    (buf.validate.field).required = true,
+    (buf.validate.field).string.uuid = true
+  ];
+}
+
+message DeleteProjectResponse {}
+
+service UsersService {
+  rpc GetUser(GetUserRequest) returns (GetUserResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  rpc CreateUser(CreateUserRequest) returns (CreateUserResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+
+  rpc UpdateUser(UpdateUserRequest) returns (UpdateUserResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+
+  rpc ListUsers(ListUsersRequest) returns (ListUsersResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  rpc DeleteUser(DeleteUserRequest) returns (DeleteUserResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+}
+
+message GetUserRequest {
+  string id = 1 [
+    (buf.validate.field).required = true,
+    (buf.validate.field).string.min_len = 1
+  ];
+}
+
+message GetUserResponse {
+  User user = 1 [(buf.validate.field).required = true];
+}
+
+message CreateUserRequest {
+  string name = 1 [(buf.validate.field).string.min_len = 1];
+}
+
+message CreateUserResponse {
+  User user = 1 [(buf.validate.field).required = true];
+}
+
+message UpdateUserRequest {
+  User user = 1 [(buf.validate.field).required = true];
+  google.protobuf.FieldMask update_mask = 2 [
+    (buf.validate.field).required = true,
+    (buf.validate.field).cel = {
+      id: "valid_field_mask"
+      message: "a field mask path must be one of name"
+      expression: "size(this.paths) > 0 && this.paths.all(path, path in ['name'])"
+    }
+  ];
+}
+
+message UpdateUserResponse {}
+
+message ListUsersRequest {
+  optional int32 page_size = 1 [
+    (buf.validate.field).int32.gt = 0,
+    (buf.validate.field).int32.lte = 100
+  ];
+  optional string page_token = 2 [(buf.validate.field).string.max_len = 256];
+}
+
+message ListUsersResponse {
+  repeated User users = 1;
+  optional string next_page_token = 2;
+}
+
+message DeleteUserRequest {
+  string id = 1 [(buf.validate.field).string.min_len = 1];
+}
+
+message DeleteUserResponse {}

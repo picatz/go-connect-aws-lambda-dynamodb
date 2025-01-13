@@ -10,7 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
-	"github.com/picatz/go-connect-aws-lambda-dynamodb/pkg/tasks/v1/service"
+	"github.com/picatz/go-connect-aws-lambda-dynamodb/pkg/donezo/v1/service"
 	"github.com/shoenig/test/must"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/localstack"
@@ -118,7 +118,7 @@ func SetupDynamoDB(ctx context.Context, awsConfig aws.Config) error {
 	dynamoDBClient := dynamodb.NewFromConfig(awsConfig)
 
 	_, err := dynamoDBClient.CreateTable(ctx, &dynamodb.CreateTableInput{
-		TableName:   service.TableTasks,
+		TableName:   service.Table,
 		BillingMode: types.BillingModePayPerRequest,
 		KeySchema: []types.KeySchemaElement{
 			{

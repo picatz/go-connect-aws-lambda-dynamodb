@@ -11,8 +11,8 @@ import (
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/awslabs/aws-lambda-go-api-proxy/httpadapter"
-	"github.com/picatz/go-connect-aws-lambda-dynamodb/pkg/tasks/v1/service"
-	"github.com/picatz/go-connect-aws-lambda-dynamodb/pkg/tasks/v1/tasksv1connect"
+	"github.com/picatz/go-connect-aws-lambda-dynamodb/pkg/donezo/v1/donezov1connect"
+	"github.com/picatz/go-connect-aws-lambda-dynamodb/pkg/donezo/v1/service"
 	lambdadetector "go.opentelemetry.io/contrib/detectors/aws/lambda"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/aws/aws-lambda-go/otellambda"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/aws/aws-lambda-go/otellambda/xrayconfig"
@@ -93,7 +93,7 @@ func Run(ctx context.Context) error {
 	mux := http.NewServeMux()
 
 	mux.Handle(
-		tasksv1connect.NewTasksServiceHandler(
+		donezov1connect.NewTasksServiceHandler(
 			srv,
 			connect.WithInterceptors(
 				otelInterceptor,

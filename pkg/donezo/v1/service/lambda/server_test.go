@@ -16,9 +16,9 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
 	"github.com/aws/aws-sdk-go-v2/service/lambda/types"
-	tasksv1 "github.com/picatz/go-connect-aws-lambda-dynamodb/pkg/tasks/v1"
-	"github.com/picatz/go-connect-aws-lambda-dynamodb/pkg/tasks/v1/service/localstack"
-	"github.com/picatz/go-connect-aws-lambda-dynamodb/pkg/tasks/v1/tasksv1connect"
+	tasksv1 "github.com/picatz/go-connect-aws-lambda-dynamodb/pkg/donezo/v1"
+	"github.com/picatz/go-connect-aws-lambda-dynamodb/pkg/donezo/v1/donezov1connect"
+	"github.com/picatz/go-connect-aws-lambda-dynamodb/pkg/donezo/v1/service/localstack"
 	"github.com/shoenig/test/must"
 	"google.golang.org/protobuf/encoding/protojson"
 )
@@ -149,7 +149,7 @@ func TestRun(t *testing.T) {
 
 	payload, err := json.Marshal(&events.APIGatewayProxyRequest{
 		HTTPMethod: http.MethodPost,
-		Path:       tasksv1connect.TasksServiceCreateTaskProcedure,
+		Path:       donezov1connect.TasksServiceCreateTaskProcedure,
 		Headers: map[string]string{
 			"Content-Type": "application/json",
 		},
